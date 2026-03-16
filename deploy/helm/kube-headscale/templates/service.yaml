@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kube-headscale.fullname" . }}
+  labels:
+    {{- include "kube-headscale.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.https.port }}
+      targetPort: https
+      protocol: TCP
+      name: https
+    - port: {{ .Values.service.stun.port }}
+      targetPort: stun
+      protocol: TCP
+      name: stun
+    - port: {{ .Values.service.metrics.port }}
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+  selector:
+    {{- include "kube-headscale.selectorLabels" . | nindent 4 }}

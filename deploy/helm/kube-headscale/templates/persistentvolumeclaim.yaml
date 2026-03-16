@@ -1,0 +1,16 @@
+{{- if .Values.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "kube-headscale.fullname" . }}
+  labels:
+    {{- include "kube-headscale.labels" . | nindent 4 }}
+spec:
+  {{- with .Values.persistence.storageClassName }}
+  storageClassName: {{ . }}
+  {{- end }}
+  accessModes: {{ .Values.persistence.accessModes | toJson }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size }}
+{{- end }}

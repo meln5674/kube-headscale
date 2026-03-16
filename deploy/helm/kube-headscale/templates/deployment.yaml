@@ -1,0 +1,160 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kube-headscale.fullname" . }}
+  labels:
+    {{- include "kube-headscale.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "kube-headscale.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        kube-headscale.meln5674.io/configmap-hash: '{{ include "kube-headscale.configmap" . | adler32sum }}'
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "kube-headscale.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "kube-headscale.serviceAccountName" . }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: headscale
+          {{- with .Values.sidecar.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ .Values.headscale.image.repository }}:{{ .Values.headscale.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.headscale.image.pullPolicy }}
+          args: [serve]
+          env:
+            {{- if .Values.headscale.config.debugKey.secret.name }}
+            - name: TS_DEBUG_KEY_PATH
+              value: /etc/headscale/debugkey
+            {{- end }}
+          ports:
+            - name: https
+              containerPort: 443
+              protocol: TCP
+            - name: stun
+              containerPort: 3478
+              protocol: UDP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.headscale.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - mountPath: /var/lib/headscale
+              name: data
+            - mountPath: /etc/headscale/config.yaml
+              name: config
+              subPath: config.yaml
+            - mountPath: /var/run/headscale
+              name: run
+            {{- if .Values.headscale.config.tls.secret.name }}
+            - mountPath: /etc/headscale/tls/
+              name: tls
+            {{- end }}
+            {{- if .Values.headscale.config.debugKey.secret.name }}
+            - mountPath: /etc/headscale/debugkey
+              name: debugkey
+              subPath: {{ .Values.headscale.config.debugKey.secret.key }}
+            {{- end }}
+            {{- if .Values.headscale.config.oidc.clientSecret.name }}
+            - mountPath: /etc/headscale/oidc_client_secret
+              name: oidc
+              subPath: {{ .Values.headscale.config.oidc.clientSecret.key }}
+            {{- end }}
+            {{- with .Values.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+        - name: sidecar
+          ports:
+            - name: derpmap
+              containerPort: 8080
+              protocol: TCP
+          {{- with .Values.sidecar.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ .Values.sidecar.image.repository }}:{{ .Values.sidecar.image.tag | default .Chart.Version }}"
+          imagePullPolicy: {{ .Values.sidecar.image.pullPolicy }}
+          {{- with .Values.sidecar.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - mountPath: /var/run/headscale
+              name: run
+    
+      volumes:
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "kube-headscale.fullname" . }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: config
+          configMap:
+            name: {{ include "kube-headscale.fullname" . }}
+        - name: run
+          emptyDir: {}
+        {{- with .Values.headscale.config.tls.secret.name }}
+        - name: tls
+          secret:
+            secretName: {{ . }}
+        {{- end }}
+        {{- with .Values.headscale.config.debugKey.secret.name }}
+        - name: debugkey
+          secret:
+            secretName: {{ . }}
+        {{- end }}
+        {{- with .Values.headscale.config.oidc.clientSecret.name }}
+        - name: oidc
+          secret:
+            secretName: {{ . }}
+        {{- end }}
+        {{- with .Values.volumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

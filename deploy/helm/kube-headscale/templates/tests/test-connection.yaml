@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "kube-headscale.fullname" . }}-test-connection"
+  labels:
+    {{- include "kube-headscale.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['{{ include "kube-headscale.fullname" . }}:{{ .Values.service.port }}']
+  restartPolicy: Never

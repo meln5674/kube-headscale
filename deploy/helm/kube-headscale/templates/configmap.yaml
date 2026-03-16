@@ -1,0 +1,27 @@
+{{- define "kube-headscale.configmap" }}
+
+{{- $_ := "" }}
+{{- $config := deepCopy .Values.headscale.config.yaml }}
+{{- if .Values.headscale.config.oidc.clientSecret.name }}
+{{- $_ = set $config.oidc "client_secret_path" "/etc/headscale/oidc_client_secret" }}
+{{- end }}
+
+{{- $_ = set $config.derp "urls" (append ($config.derp.urls | default (list)) "http://localhost:8080/derpmap") }}
+{{- $_ = set $config.policy "mode" "database" }}
+{{- $_ = set $config.dns "extra_records_path" "/var/run/headscale/dns-configmaps.json" }}
+{{- if .Values.headscale.config.tls.secret.name }}
+{{- $_ = set $config "tls_cert_path" "/etc/headscale/tls/tls.crt" }}
+{{- $_ = set $config "tls_key_path" "/etc/headscale/tls/tls.key" }}
+{{- end }}
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kube-headscale.fullname" . }}
+  labels:
+    {{- include "kube-headscale.labels" . | nindent 4 }}
+data:
+  config.yaml: |-
+    {{- $config | toYaml | nindent 4 }}
+{{- end }}
+{{ include "kube-headscale.configmap" . }}
