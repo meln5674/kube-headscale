@@ -14,6 +14,11 @@
 {{- $_ = set $config "tls_key_path" "/etc/headscale/tls/tls.key" }}
 {{- end }}
 
+
+{{- if not $config.listen_addr }}
+{{- $_ = set $config "listen_addr" (printf "0.0.0.0:%s" (include "kube-headscale.defaultPort" .)) }}
+{{- end }}
+
 apiVersion: v1
 kind: ConfigMap
 metadata:

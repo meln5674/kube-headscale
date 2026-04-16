@@ -60,3 +60,20 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{- define "kube-headscale.portName" -}}
+{{- if .Values.headscale.config.tls.secret.name -}}
+https
+{{- else -}}
+http
+{{- end -}}
+{{- end -}}
+
+
+{{- define "kube-headscale.defaultPort" -}}
+{{- if .Values.headscale.config.tls.secret.name -}}
+443
+{{- else -}}
+80
+{{- end -}}
+{{- end -}}

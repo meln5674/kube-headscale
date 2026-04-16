@@ -7,10 +7,10 @@ metadata:
 spec:
   type: {{ .Values.service.type }}
   ports:
-    - port: {{ .Values.service.https.port }}
-      targetPort: https
+    - port: {{ .Values.service.https.port | default (include "kube-headscale.defaultPort" .) }}
+      targetPort: {{ include "kube-headscale.portName" . }}
       protocol: TCP
-      name: https
+      name: {{ include "kube-headscale.portName" . }}
     - port: {{ .Values.service.stun.port }}
       targetPort: stun
       protocol: TCP

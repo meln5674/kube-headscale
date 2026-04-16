@@ -20,7 +20,8 @@ headscale:
     yaml:
       # auto-generated to be internal cluster DNS name if absent
       # server_url: https://headscale.example.com
-      listen_addr: 0.0.0.0:443
+      # Defaults to 0.0.0.0:80 or 0.0.0.0:443 depends on if tls is enabled
+      listen_addr: ~
       # Must be 0.0.0.0 for metrics collection to work
       metrics_listen_addr: 0.0.0.0:9090
       grpc_listen_addr: 127.0.0.1:50443
@@ -156,7 +157,8 @@ service:
   type: ClusterIP
   # This sets the ports more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
   https:
-    port: 443
+    # Defaults to 80 or 443 depending on if tls is enabled
+    port: ~
   stun:
     port: 3478
   metrics:
