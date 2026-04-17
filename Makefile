@@ -4,6 +4,11 @@ all: bin/kube-headscale
 GOFILES=$(shell find ./ -name '*.go' -not -name '*_test.go')
 GOTESTFILES=$(shell find ./ -name '*_test.go')
 
+.PHONY: lint
+lint:
+	go vet ./...
+	helm lint ./deploy/helm/kube-headscale/
+
 bin/kube-headscale: $(GOFILES)
 	go build -o $@
 
@@ -70,3 +75,54 @@ test: bin/coverprofile.out
 .PHONY: coverage
 coverage: bin/coverprofile.out
 	go tool cover -html=$^
+
+
+DOCKER=docker
+HELM=helm
+
+CHART_DIR=./deploy/helm/kube-headscale/
+
+IMAGE_REGISTRY ?= ghcr.io
+IMAGE_REPO ?= meln5674/kube-headscale
+IMAGE_TAG ?= latest
+IMAGE_REF ?= $(IMAGE_REGISTRY)/$(IMAGE_REPO):$(IMAGE_TAG)
+
+.PHONY: image push-image
+image:
+	$(DOCKER) build -t $(IMAGE_REF) .
+
+DEBUG_IMAGE_TAG ?= $(IMAGE_TAG)-debug
+DEBUG_IMAGE_REF ?= $(IMAGE_REGISTRY)/$(IMAGE_REPO):$(IMAGE_TAG)
+push-image:
+	$(DOCKER) push $(IMAGE_REF)
+
+
+.PHONY: debug-image
+debug-image: bin/kube-headscale
+	$(DOCKER) build -t $(DEBUG_IMAGE_REF) -f debug.Dockerfile .
+
+CHART_YAML=$(CHART_DIR)/Chart.yaml
+CHART_NAME=$(shell yq .name $(CHART_YAML))
+CHART_VERSION=$(shell yq .version $(CHART_YAML))
+CHART_APP_VERSION ?=
+
+CHART_REMOTE ?= oci://$(IMAGE_REGISTRY)/$(CHART_REPO)
+CHART_REPO ?= $(IMAGE_REPO)/chart/
+
+CHART_TARBALL_DIR ?= bin
+CHART_TARBALL ?= $(CHART_TARBALL_DIR)/$(CHART_NAME)-$(CHART_VERSION).tgz
+
+$(CHART_TARBALL):
+	$(HELM) package $(CHART_DIR) --destination $(CHART_TARBALL_DIR) --version '$(IMAGE_TAG)'
+
+.PHONY: chart
+chart: $(CHART_TARBALL)
+
+CHART_TAG_FILE ?= $(CHART_TARBALL).tag
+CHART_DIGEST_FILE ?= $(CHART_TARBALL).digest
+
+.PHONY: push-chart
+push-chart:
+	out="$$($(HELM) push $(CHART_TARBALL) $(CHART_REMOTE))" \
+	&& echo "$${out}" | grep Digest: | awk '{ print $$2 }'
+

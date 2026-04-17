@@ -4,26 +4,24 @@ WORKDIR /src
 
 COPY go.* ./
 RUN \
-  # --mount=type=cache,dst=/go \
+  --mount=type=cache,dst=/go \
   go mod download
 
 COPY main.go main.go
 COPY cmd/ cmd/
 
 RUN \
-  # --mount=type=cache,dst=/go \
-  # CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH \
+  --mount=type=cache,dst=/go \
+  CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH \
   go build -trimpath
 
-# FROM scratch
-FROM debian:trixie
+FROM scratch
 
 ENV PATH=${PATH}:/
 
 LABEL maintainer=github.com/meln5674
 
-# COPY --from=build /src/kube-headscale /kube-headscale
-COPY kube-headscale /kube-headscale
+COPY --from=build /src/kube-headscale /kube-headscale
 
 EXPOSE 8080
 
