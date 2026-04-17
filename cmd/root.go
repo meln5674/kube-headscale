@@ -348,7 +348,7 @@ func (st labelState) needsFinalize() bool {
 
 func (st labelState) finalize(meta *metav1.ObjectMeta) {
 	if st.hasFinalizer {
-		slices.DeleteFunc(meta.Finalizers, func(s string) bool { return s == st.label })
+		meta.Finalizers = slices.DeleteFunc(meta.Finalizers, func(s string) bool { return s == st.label })
 	}
 }
 
@@ -356,7 +356,7 @@ func addKeys[V, S any](dst map[string]V, name string, src map[string]S, parse fu
 	for k, s := range src {
 		v, err := parse(s)
 		if err != nil {
-			return fmt.Errorf("%s: %w", s, err)
+			return fmt.Errorf("%v: %w", s, err)
 		}
 		dst[name+"/"+k] = v
 	}
