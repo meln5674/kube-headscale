@@ -26,7 +26,8 @@ HEADSCALE_URL ?= $(HEADSCALE_MIRROR)/v$(HEADSCALE_VERSION)/headscale_$(HEADSCALE
 
 HEADSCALE ?= bin/headscale
 
-bin/headscale:
+$(HEADSCALE):
+	mkdir -p $(shell dirname $(HEADSCALE))
 	wget -O $@ $(HEADSCALE_URL)
 	chmod +x $@
 
@@ -39,11 +40,19 @@ TAILSCALE_TGZ=bin/tailscale_$(TAILSCALE_VERSION)_$(GOARCH).tgz
 TAILSCALE_TGZ_DIR=tailscale_$(TAILSCALE_VERSION)_$(GOARCH)
 
 $(TAILSCALE_TGZ):
+	mkdir -p $(shell dirname $(HEADSCALE))
 	wget -O $@ $(TAILSCALE_URL)
 
-bin/tailscale bin/tailscaled &: $(TAILSCALE_TGZ)
-	tar -xzf $^ -C bin --strip-components=1 $(TAILSCALE_TGZ_DIR)/tailscale $(TAILSCALE_TGZ_DIR)/tailscaled
-	touch -c bin/tailscale bin/tailscaled
+TAILSCALE ?= bin/tailscale
+TAILSCALED ?= bin/tailscaled
+
+$(TAILSCALE): $(TAILSCALE_TGZ)
+	tar -xzf $^ -C $(shell dirname $(TAILSCALE)) --strip-components=1 $(TAILSCALE_TGZ_DIR)/tailscale
+	touch -c $(TAILSCALE)
+
+$(TAILSCALED): $(TAILSCALE_TGZ)
+	tar -xzf $^ -C $(shell dirname $(TAILSCALE)) --strip-components=1 $(TAILSCALE_TGZ_DIR)/tailscaled
+	touch -c $(TAILSCALED)
 
 
 ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
@@ -57,13 +66,13 @@ ENVTEST_BINS = \
 	$(LOCALBIN)/k8s/$(ENVTEST_SUBDIR)/kubectl \
 	$(LOCALBIN)/k8s/$(ENVTEST_SUBDIR)/kube-apiserver \
 	$(LOCALBIN)/k8s/$(ENVTEST_SUBDIR)/etcd
-$(ENVTEST_BINS):
+$(ENVTEST_BINS) &:
 	$(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path
 
 GINKGO ?= go tool ginkgo
 GOCOVERDIR ?= $(LOCALBIN)/gocoverdir
 
-bin/coverprofile.out: $(HEADSCALE) bin/kube-headscale.cover $(ENVTEST_BINS) $(GOTESTFILES)
+bin/coverprofile.out: $(HEADSCALE) $(TAILSCALE) $(TAILSCALED) $(ENVTEST_BINS) bin/kube-headscale.cover $(GOTESTFILES)  
 	rm -rf $(GOCOVERDIR)
 	mkdir $(GOCOVERDIR)
 	GOCOVERDIR=$(GOCOVERDIR) KUBEBUILDER_ASSETS=$(ENVTEST_BINDIR) $(GINKGO) run $(GINKGO_ARGS)
@@ -103,7 +112,7 @@ debug-image: bin/kube-headscale
 
 CHART_YAML=$(CHART_DIR)/Chart.yaml
 CHART_NAME=$(shell yq .name $(CHART_YAML))
-CHART_VERSION=$(shell yq .version $(CHART_YAML))
+CHART_VERSION ?= $(shell yq .version $(CHART_YAML))
 CHART_APP_VERSION ?=
 
 CHART_REMOTE ?= oci://$(IMAGE_REGISTRY)/$(CHART_REPO)
@@ -123,6 +132,4 @@ CHART_DIGEST_FILE ?= $(CHART_TARBALL).digest
 
 .PHONY: push-chart
 push-chart:
-	out="$$($(HELM) push $(CHART_TARBALL) $(CHART_REMOTE))" \
-	&& echo "$${out}" | grep Digest: | awk '{ print $$2 }'
-
+	hack/push-chart.sh "$(HELM)" "${CHART_TARBALL}" "${CHART_REMOTE}" "${CHART_TAG_FILE}" "${CHART_DIGEST_FILE}"
