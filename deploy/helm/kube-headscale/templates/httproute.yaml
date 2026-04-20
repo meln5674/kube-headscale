@@ -1,6 +1,6 @@
 {{- if .Values.httpRoute.enabled -}}
 {{- $fullName := include "kube-headscale.fullname" . -}}
-{{- $svcPort := .Values.service.https.port -}}
+{{- $svcPort := .Values.service.https.port | default (include "kube-headscale.portName" .) -}}
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:

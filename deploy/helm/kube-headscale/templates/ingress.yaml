@@ -1,4 +1,5 @@
 {{- if .Values.ingress.enabled -}}
+{{- $svcPort := .Values.service.https.port | default (include "kube-headscale.portName" .) -}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -37,7 +38,7 @@ spec:
               service:
                 name: {{ include "kube-headscale.fullname" $ }}
                 port:
-                  number: {{ $.Values.service.https.port }}
+                  name: {{ $svcPort }}
           {{- end }}
     {{- end }}
 {{- end }}
